@@ -1,0 +1,25 @@
+{
+  "name": "map2dfusion",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pierotofy/node-map2dfusion.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/pierotofy/node-map2dfusion/issues"
+  },
+  "homepage": "https://github.com/pierotofy/node-map2dfusion#readme",
+  "dependencies": {
+    "minimist": "^1.2.0",
+    "node-exiftool": "^2.3.0",
+    "three": "^0.90.0",
+    "utm": "^1.1.1"
+  }
+}
