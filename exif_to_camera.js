@@ -7,17 +7,24 @@ const utm = require('utm');
 
 const [ imagesDir, outputFile ] = argv._;
 
+// http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToAngle/
+function quaternionToAxisAngle(quaternion){
+	if (quaternion.w > 1) quaternion.normalize();
+	const angle = 2 * Math.acos(quaternion.w);
 
-function rotate(vector, angleaxis) {
-    var v = new THREE.Vector3(vector[0], vector[1], vector[2]);
-    var axis = new THREE.Vector3(angleaxis[0],
-                                 angleaxis[1],
-                                 angleaxis[2]);
-    var angle = axis.length();
-    axis.normalize();
-    var matrix = new THREE.Matrix4().makeRotationAxis(axis, angle);
-    v.applyMatrix4(matrix);
-    return v;
+	const s = Math.sqrt(1 - quaternion.w * quaternion.w);
+	let v;
+	if (s < 0.001){
+		v = new THREE.Vector3(
+				quaternion.x, quaternion.y, quaternion.z
+			);
+	}else{
+		v = new THREE.Vector3(
+				quaternion.x / s, quaternion.y / s, quaternion.z / s
+			);
+	}
+	v.multiplyScalar(angle);
+	return v;
 }
 
 exifParser.readFromFolder(imagesDir)
@@ -31,7 +38,6 @@ exifParser.readFromFolder(imagesDir)
 			  zAxis = new THREE.Vector3(0, 0, 1);
 		let center = null;
 
-
 		data.forEach(exif => {
 			exif.GPSPosition = exif.GPSPosition.replace(/ deg /g, '°');
 			const { lat, lon } = parseDMS(exif.GPSPosition);
@@ -39,33 +45,38 @@ exifParser.readFromFolder(imagesDir)
 			const { easting, northing, zoneNum } = utm.fromLatLon(lat, lon);
 
 			let pitch = parseFloat(exif.Pitch),
-				yaw = parseFloat(exif.Yaw),
-				roll = parseFloat(exif.Roll);
+				yaw = parseFloat(exif.Yaw);
+				// roll = parseFloat(exif.Roll);
 
-			if (exif.CameraPitch) pitch += parseFloat(exif.CameraPitch);
-			if (exif.CameraYaw) yaw += parseFloat(exif.CameraYaw);
-			if (exif.CameraRoll) roll += parseFloat(exif.CameraRoll);
+			if (exif.CameraPitch !== undefined) pitch = parseFloat(exif.CameraPitch);
+			if (exif.CameraYaw !== undefined) yaw = parseFloat(exif.CameraYaw);
 
-			const cameraRot = new THREE.Vector3(0, Math.PI, 0);
-			// cameraRot.applyAxisAngle(zAxis, THREE.Math.degToRad(pitch));
-			// cameraRot.applyAxisAngle(yAxis, THREE.Math.degToRad(yaw));
-			// cameraRot.applyAxisAngle(xAxis, THREE.Math.degToRad(roll));
-			// cameraRot.normalize();
+			const rotationX = new THREE.Matrix4().makeRotationX(THREE.Math.degToRad(pitch - 90));
+			const rotationY = new THREE.Matrix4().makeRotationY(THREE.Math.degToRad(180));
+			const rotationZ = new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(yaw));
+			
+			const cameraRot = new THREE.Matrix4();
+			cameraRot.multiply(rotationX);
+			cameraRot.multiply(rotationY);
+			cameraRot.multiply(rotationZ);
 
 			const quaternion = new THREE.Quaternion();
-			quaternion.setFromAxisAngle( cameraRot, Math.PI );
+			quaternion.setFromRotationMatrix(cameraRot);
+
+			const axisAngle = quaternionToAxisAngle(quaternion);
 
 			const cameraPos = new THREE.Vector3(easting, northing, parseFloat(exif.RelativeAltitude));
 			if (!center) center = cameraPos.clone();
 			cameraPos.x = cameraPos.x - center.x;
 			cameraPos.y = cameraPos.y - center.y;
 
+			cameraPos.applyQuaternion(quaternion);
+
 			cameras.push({
 				file: exif.SourceFile,
 				x: cameraPos.x,
 				y: cameraPos.y,
 				z: cameraPos.z,
-				rot: cameraRot,
 				rx: quaternion.x,
 				ry: quaternion.y,
 				rz: quaternion.z,
@@ -75,16 +86,10 @@ exifParser.readFromFolder(imagesDir)
 			shots[exif.SourceFile] = {
                 "orientation": 1, 
                 "camera": "v2 dji fc300s 4000 2250 perspective 0.5555", 
-                "gps_position": [
-                    cameraPos.x,
-                    cameraPos.y,
-                    cameraPos.z
-                ], 
-                "gps_dop": 0, 
                 "rotation": [
-                    cameraRot.x,
-                    cameraRot.y,
-                    cameraRot.z
+                    axisAngle.x,
+                    axisAngle.y,
+                    axisAngle.z
                 ], 
                 "translation": [
                     cameraPos.x,
@@ -113,7 +118,6 @@ exifParser.readFromFolder(imagesDir)
         "shots": shots}];
 
        fs.writeFileSync('/data/OpenSfM/viewer/fusion.json', JSON.stringify(out));
-            
 
 		// TX TY TZ (relative to ground, not absolute) RX RY RZ W
 	});
