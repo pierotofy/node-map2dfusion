@@ -1,11 +1,17 @@
 const argv = require('minimist')(process.argv.slice(2));
 const fs = require('fs');
+const path = require('path');
 const exifParser = require('./libs/exifParser');
 const parseDMS = require('parse-dms');
 const THREE = require('three');
 const utm = require('utm');
 
 const [ imagesDir, outputFile ] = argv._;
+
+if (!fs.existsSync(imagesDir)){
+	console.log("Directory does not exist: " + imagesDir);
+	process.exit(1);
+}
 
 // http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToAngle/
 function quaternionToAxisAngle(quaternion){
@@ -27,11 +33,64 @@ function quaternionToAxisAngle(quaternion){
 	return v;
 }
 
+function writeCamerasToOpenSfM(cameras, outputFile){
+	const shots = {};
+
+	cameras.forEach(camera => {
+		const quaternion = new THREE.Quaternion(camera.rx, camera.ry, camera.rz, camera.rw);
+		const axisAngle = quaternionToAxisAngle(quaternion);
+
+		shots[camera.file] = {
+	                "orientation": 1, 
+	                "camera": "v2 dji fc300s 4000 2250 perspective 0.5555", 
+	                "rotation": [
+	                    axisAngle.x,
+	                    axisAngle.y,
+	                    axisAngle.z
+	                ], 
+	                "translation": [
+	                    camera.x,
+	                    camera.y,
+	                    camera.z
+	                ], 
+	                "capture_time": 0
+				}
+	});
+
+	const json = [
+	{
+    "cameras": {
+        "v2 dji fc300s 4000 2250 perspective 0.5555": {
+            "focal_prior": 0.5555555555555556, 
+            "width": 4000, 
+            "k1": 0.0009621221480173682, 
+            "k2": 0.012564384069413442, 
+            "k1_prior": 0.0, 
+            "k2_prior": 0.0, 
+            "projection_type": "perspective", 
+            "focal": 0.5557508768659184, 
+            "height": 2250
+        }
+    }, 
+    "shots": shots}];
+
+	fs.writeFileSync(outputFile, JSON.stringify(json));
+}
+
+function writeCamerasToMap2DFusion(cameras, outputFile){
+	// TX TY TZ (relative to ground, not absolute) RX RY RZ W
+
+	const output = cameras.map(camera => {
+		return `${camera.file} ${camera.x} ${camera.y} ${camera.z} ${camera.rx} ${camera.ry} ${camera.rz} ${camera.rw}`
+	}).join("\n");
+
+	fs.writeFileSync(outputFile, output);
+}
+
 exifParser.readFromFolder(imagesDir)
 	.then(data => {
 		// Create cameras
 		const cameras = [];
-		const shots = {};
 
 		const xAxis = new THREE.Vector3(1, 0, 0),
 			  yAxis = new THREE.Vector3(0, 1, 0),
@@ -63,8 +122,6 @@ exifParser.readFromFolder(imagesDir)
 			const quaternion = new THREE.Quaternion();
 			quaternion.setFromRotationMatrix(cameraRot);
 
-			const axisAngle = quaternionToAxisAngle(quaternion);
-
 			const cameraPos = new THREE.Vector3(easting, northing, parseFloat(exif.RelativeAltitude));
 			if (!center) center = cameraPos.clone();
 			cameraPos.x = cameraPos.x - center.x;
@@ -73,7 +130,7 @@ exifParser.readFromFolder(imagesDir)
 			cameraPos.applyQuaternion(quaternion);
 
 			cameras.push({
-				file: exif.SourceFile,
+				file: path.basename(exif.SourceFile),
 				x: cameraPos.x,
 				y: cameraPos.y,
 				z: cameraPos.z,
@@ -82,43 +139,9 @@ exifParser.readFromFolder(imagesDir)
 				rz: quaternion.z,
 				rw: quaternion.w
 			});
-
-			shots[exif.SourceFile] = {
-                "orientation": 1, 
-                "camera": "v2 dji fc300s 4000 2250 perspective 0.5555", 
-                "rotation": [
-                    axisAngle.x,
-                    axisAngle.y,
-                    axisAngle.z
-                ], 
-                "translation": [
-                    cameraPos.x,
-                    cameraPos.y,
-                    cameraPos.z
-                ], 
-                "capture_time": 0
-			}
 		});
 
-		let out = [
-    	{
-        "cameras": {
-            "v2 dji fc300s 4000 2250 perspective 0.5555": {
-                "focal_prior": 0.5555555555555556, 
-                "width": 4000, 
-                "k1": 0.0009621221480173682, 
-                "k2": 0.012564384069413442, 
-                "k1_prior": 0.0, 
-                "k2_prior": 0.0, 
-                "projection_type": "perspective", 
-                "focal": 0.5557508768659184, 
-                "height": 2250
-            }
-        }, 
-        "shots": shots}];
-
-       fs.writeFileSync('/data/OpenSfM/viewer/fusion.json', JSON.stringify(out));
-
-		// TX TY TZ (relative to ground, not absolute) RX RY RZ W
+		// writeCamerasToOpenSfM(cameras, '/data/OpenSfM/viewer/fusion.json');
+		writeCamerasToMap2DFusion(cameras, outputFile);
 	});
 
