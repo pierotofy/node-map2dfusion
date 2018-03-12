@@ -69,7 +69,7 @@ function writeCamerasToOpenSfM(cameras, outputFile){
             "k2_prior": 0.0, 
             "projection_type": "perspective", 
             "focal": 0.5557508768659184, 
-            "height": 2250
+            "height": 3000
         }
     }, 
     "shots": shots}];
@@ -81,7 +81,7 @@ function writeCamerasToMap2DFusion(cameras, outputFile){
 	// TX TY TZ (relative to ground, not absolute) RX RY RZ W
 
 	const output = cameras.map(camera => {
-		return `${camera.file} ${camera.x} ${camera.y} ${camera.z} ${camera.rx} ${camera.ry} ${camera.rz} ${camera.rw}`
+		return `${camera.file.replace(/\.\w{3,4}$/, "")} ${camera.x.toFixed(6)} ${camera.y.toFixed(6)} ${camera.z.toFixed(6)} ${camera.rx.toFixed(6)} ${camera.ry.toFixed(6)} ${camera.rz.toFixed(6)} ${camera.rw.toFixed(6)}`
 	}).join("\n");
 
 	fs.writeFileSync(outputFile, output);
@@ -124,10 +124,15 @@ exifParser.readFromFolder(imagesDir)
 
 			const cameraPos = new THREE.Vector3(easting, northing, parseFloat(exif.RelativeAltitude));
 			if (!center) center = cameraPos.clone();
+
 			cameraPos.x = cameraPos.x - center.x;
 			cameraPos.y = cameraPos.y - center.y;
 
-			cameraPos.applyQuaternion(quaternion);
+			// cameraPos.applyQuaternion(quaternion);
+
+			const quaternionFlipped = new THREE.Quaternion();
+			quaternionFlipped.setFromAxisAngle(new THREE.Vector3(1, 0, 0), THREE.Math.degToRad(180));
+			quaternion.multiply(quaternionFlipped);
 
 			cameras.push({
 				file: path.basename(exif.SourceFile),
@@ -141,7 +146,7 @@ exifParser.readFromFolder(imagesDir)
 			});
 		});
 
-		// writeCamerasToOpenSfM(cameras, '/data/OpenSfM/viewer/fusion.json');
+		writeCamerasToOpenSfM(cameras, '/data/OpenSfM/viewer/fusion.json');
 		writeCamerasToMap2DFusion(cameras, outputFile);
 	});
 
