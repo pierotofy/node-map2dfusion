@@ -92,9 +92,6 @@ exifParser.readFromFolder(imagesDir)
 		// Create cameras
 		const cameras = [];
 
-		const xAxis = new THREE.Vector3(1, 0, 0),
-			  yAxis = new THREE.Vector3(0, 1, 0),
-			  zAxis = new THREE.Vector3(0, 0, 1);
 		let center = null;
 
 		data.forEach(exif => {
@@ -110,9 +107,9 @@ exifParser.readFromFolder(imagesDir)
 			if (exif.CameraPitch !== undefined) pitch = parseFloat(exif.CameraPitch);
 			if (exif.CameraYaw !== undefined) yaw = parseFloat(exif.CameraYaw);
 
-			const rotationX = new THREE.Matrix4().makeRotationX(THREE.Math.degToRad(pitch - 90));
+			const rotationX = new THREE.Matrix4().makeRotationX(THREE.Math.degToRad(90 - pitch));
 			const rotationY = new THREE.Matrix4().makeRotationY(THREE.Math.degToRad(180));
-			const rotationZ = new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(yaw));
+			const rotationZ = new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-yaw));
 			
 			const cameraRot = new THREE.Matrix4();
 			cameraRot.multiply(rotationX);
@@ -122,17 +119,24 @@ exifParser.readFromFolder(imagesDir)
 			const quaternion = new THREE.Quaternion();
 			quaternion.setFromRotationMatrix(cameraRot);
 
-			const cameraPos = new THREE.Vector3(easting, northing, parseFloat(exif.RelativeAltitude));
+			const cameraPos = new THREE.Vector3(-easting, northing, parseFloat(exif.RelativeAltitude));
 			if (!center) center = cameraPos.clone();
 
 			cameraPos.x = cameraPos.x - center.x;
 			cameraPos.y = cameraPos.y - center.y;
 
-			// cameraPos.applyQuaternion(quaternion);
+			cameraPos.applyQuaternion(quaternion);
 
-			const quaternionFlipped = new THREE.Quaternion();
-			quaternionFlipped.setFromAxisAngle(new THREE.Vector3(1, 0, 0), THREE.Math.degToRad(180));
-			quaternion.multiply(quaternionFlipped);
+			const rotWorld = new THREE.Matrix4();
+			rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-90	)));
+			rotWorld.multiply(new THREE.Matrix4().makeRotationX(THREE.Math.degToRad(180)));
+			rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-90)));
+
+
+			const quatWorld = new THREE.Quaternion();
+			quatWorld.setFromRotationMatrix(rotWorld);
+
+			quaternion.multiply(quatWorld);
 
 			cameras.push({
 				file: path.basename(exif.SourceFile),
