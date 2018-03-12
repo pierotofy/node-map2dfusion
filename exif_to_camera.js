@@ -107,9 +107,13 @@ exifParser.readFromFolder(imagesDir)
 			if (exif.CameraPitch !== undefined) pitch = parseFloat(exif.CameraPitch);
 			if (exif.CameraYaw !== undefined) yaw = parseFloat(exif.CameraYaw);
 
+			// if (Math.abs(yaw) > 90){
+			// 	yaw += 180;
+			// }
+
 			const rotationX = new THREE.Matrix4().makeRotationX(THREE.Math.degToRad(90 - pitch));
 			const rotationY = new THREE.Matrix4().makeRotationY(THREE.Math.degToRad(180));
-			const rotationZ = new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-yaw));
+			const rotationZ = new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(180 - yaw));
 			
 			const cameraRot = new THREE.Matrix4();
 			cameraRot.multiply(rotationX);
@@ -130,7 +134,7 @@ exifParser.readFromFolder(imagesDir)
 			const rotWorld = new THREE.Matrix4();
 			rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-90	)));
 			rotWorld.multiply(new THREE.Matrix4().makeRotationX(THREE.Math.degToRad(180)));
-			rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-90)));
+			rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-270)));
 
 
 			const quatWorld = new THREE.Quaternion();
