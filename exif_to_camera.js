@@ -123,18 +123,18 @@ exifParser.readFromFolder(imagesDir)
 			const quaternion = new THREE.Quaternion();
 			quaternion.setFromRotationMatrix(cameraRot);
 
-			const cameraPos = new THREE.Vector3(-easting, northing, parseFloat(exif.RelativeAltitude));
+			const cameraPos = new THREE.Vector3(easting, northing, parseFloat(exif.RelativeAltitude));
 			if (!center) center = cameraPos.clone();
 
 			cameraPos.x = cameraPos.x - center.x;
 			cameraPos.y = cameraPos.y - center.y;
 
-			cameraPos.applyQuaternion(quaternion);
+			// cameraPos.applyQuaternion(quaternion);
 
 			const rotWorld = new THREE.Matrix4();
-			rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-90	)));
+			// rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-90	)));
 			rotWorld.multiply(new THREE.Matrix4().makeRotationX(THREE.Math.degToRad(180)));
-			rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-270)));
+			// rotWorld.multiply(new THREE.Matrix4().makeRotationZ(THREE.Math.degToRad(-270)));
 
 
 			const quatWorld = new THREE.Quaternion();
